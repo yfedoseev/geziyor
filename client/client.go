@@ -2,12 +2,6 @@ package client
 
 import (
 	"context"
-	"github.com/chromedp/cdproto/dom"
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/chromedp"
-	"github.com/pkg/errors"
-	"golang.org/x/net/html/charset"
-	"golang.org/x/text/transform"
 	"io"
 	"io/ioutil"
 	"log"
@@ -16,6 +10,15 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/dom"
+	"github.com/chromedp/cdproto/fetch"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/chromedp"
+	"github.com/pkg/errors"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/transform"
 )
 
 var (
@@ -169,6 +172,7 @@ func (c *Client) DoRequestChrome(req *Request) (*Response, error) {
 	var body string
 	var res *network.Response
 
+	
 	ctx := context.Background()
 	if c.opt.RemoteAllocatorURL != "" {
 		ctx, _ = chromedp.NewRemoteAllocator(ctx, c.opt.RemoteAllocatorURL)
@@ -176,8 +180,11 @@ func (c *Client) DoRequestChrome(req *Request) (*Response, error) {
 	ctx, cancel := chromedp.NewContext(ctx)
 	defer cancel()
 
+	chromedp.ListenTarget(ctx, disableResourceLoad(ctx, req.Disabled))
+
 	if err := chromedp.Run(ctx,
 		network.Enable(),
+		fetch.Enable(),
 		network.SetExtraHTTPHeaders(ConvertHeaderToMap(req.Header)),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			var reqID network.RequestID
@@ -290,5 +297,46 @@ func NewRedirectionHandler(maxRedirect int) func(req *http.Request, via []*http.
 			return errors.Errorf("stopped after %d redirects", maxRedirect)
 		}
 		return nil
+	}
+}
+
+func disableResourceLoad(ctx context.Context, rtp ResourceType) func(event interface{}) {
+	return func(event interface{}) {
+		switch ev := event.(type) {
+		case *fetch.EventRequestPaused:
+			go func() {
+				c := chromedp.FromContext(ctx)
+				ctx := cdp.WithExecutor(ctx, c.Target)
+				types := map[network.ResourceType]ResourceType{
+					network.ResourceTypeDocument:           ResourceTypeDocument,
+					network.ResourceTypeStylesheet:         ResourceTypeStylesheet,
+					network.ResourceTypeImage:              ResourceTypeImage,
+					network.ResourceTypeMedia:              ResourceTypeMedia,
+					network.ResourceTypeFont:               ResourceTypeFont,
+					network.ResourceTypeScript:             ResourceTypeScript,
+					network.ResourceTypeTextTrack:          ResourceTypeTextTrack,
+					network.ResourceTypeXHR:                ResourceTypeXHR,
+					network.ResourceTypeFetch:              ResourceTypeFetch,
+					network.ResourceTypeEventSource:        ResourceTypeEventSource,
+					network.ResourceTypeWebSocket:          ResourceTypeWebSocket,
+					network.ResourceTypeSignedExchange:     ResourceTypeSignedExchange,
+					network.ResourceTypePing:               ResourceTypePing,
+					network.ResourceTypeCSPViolationReport: ResourceTypeCSPViolationReport,
+					network.ResourceTypeOther:              ResourceTypeOther,
+				}
+				var failed = false
+				for netrestype, restype := range types {
+					if ev.ResourceType == netrestype {
+						if rtp&restype > 0 {
+							fetch.FailRequest(ev.RequestID, network.ErrorReasonConnectionAborted).Do(ctx)
+							failed = true
+						}
+					}
+				}
+				if !failed {
+					fetch.ContinueRequest(ev.RequestID).Do(ctx)
+				}
+			}()
+		}
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"flag"
-	"github.com/geziyor/geziyor/cache/memorycache"
+	"github.com/yfedoseev/geziyor/cache/memorycache"
 	"io"
 	"io/ioutil"
 	"net/http"

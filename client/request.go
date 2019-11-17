@@ -5,6 +5,27 @@ import (
 	"net/http"
 )
 
+type ResourceType int
+
+const (
+	ResourceTypeDocument ResourceType = 1 << iota
+	ResourceTypeStylesheet
+	ResourceTypeImage
+	ResourceTypeMedia
+	ResourceTypeFont
+	ResourceTypeScript
+	ResourceTypeTextTrack
+	ResourceTypeXHR
+	ResourceTypeFetch
+	ResourceTypeEventSource
+	ResourceTypeWebSocket
+	ResourceTypeManifest
+	ResourceTypeSignedExchange
+	ResourceTypePing
+	ResourceTypeCSPViolationReport
+	ResourceTypeOther
+)
+
 // Request is a small wrapper around *http.Request that contains Metadata and Rendering option
 type Request struct {
 	*http.Request
@@ -26,6 +47,9 @@ type Request struct {
 
 	// Set this true to cancel requests. Should be used on middlewares.
 	Cancelled bool
+
+	// Resources that will be disabled
+	Disabled ResourceType
 
 	retryCounter int
 }

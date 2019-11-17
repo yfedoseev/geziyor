@@ -1,10 +1,10 @@
 package geziyor
 
 import (
-	"github.com/geziyor/geziyor/cache"
-	"github.com/geziyor/geziyor/client"
-	"github.com/geziyor/geziyor/metrics"
-	"github.com/geziyor/geziyor/middleware"
+	"github.com/yfedoseev/geziyor/cache"
+	"github.com/yfedoseev/geziyor/client"
+	"github.com/yfedoseev/geziyor/metrics"
+	"github.com/yfedoseev/geziyor/middleware"
 	"io/ioutil"
 	"log"
 	"net/http/cookiejar"
